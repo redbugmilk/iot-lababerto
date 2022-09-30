@@ -8,6 +8,7 @@
 #include "nvs_flash.h" //access to the permanent memory
 #include "mqtt_client.h"
 #include "dht11.h"
+#include "ssd1306.h"
 
 
 //Log
@@ -15,10 +16,12 @@
 #define TAG_MQTT "MQTT"
 #define TAG_LED "LED"
 #define TAG_SENSOR "SENSOR"
+#define TAG_DISPLAY "DISPLAY"
+
 
 //WIFI
-#define WIFI_SSID   "lababerto"
-#define WIFI_PASS   "lababerto"
+#define WIFI_SSID   ""
+#define WIFI_PASS   ""
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 #define WIFI_MAXIMUM_RETRY  10
@@ -32,6 +35,10 @@
 #define DATA_SENSOR 22
 #define PINS_SEL  ((1ULL<<LED_BLUE_BOARD) | (1ULL<<LED_RED))
 
+//TODO: give pins
+#define CONFIG_SDA_GPIO 1
+#define CONFIG_SCL_GPIO 3
+
 //Topics
 #define BOOTCAMP_HEALTH "bootcamp/+/health"
 #define LED_BLUE_SET "bootcamp/joana/led/blue/set"
@@ -44,6 +51,8 @@ static EventGroupHandle_t eventGroup;
 static int retryNum = 0; //static store on the static memory
 static struct MQTTMessage message;
 static esp_mqtt_client_handle_t client;
+TaskHandle_t xHandle = NULL;
+SSD1306_t dev;
 
 struct MQTTMessage {
     char payload[1024];
@@ -229,6 +238,20 @@ void initSensor(){
     DHT11_init(DATA_SENSOR);
 }
 
+void initDisplay(){
+	ESP_LOGI(TAG_DISPLAY, "CONFIG_SDA_GPIO=%d",CONFIG_SDA_GPIO);
+	ESP_LOGI(TAG_DISPLAY, "CONFIG_SCL_GPIO=%d",CONFIG_SCL_GPIO);
+	i2c_master_init(&dev, CONFIG_SDA_GPIO, CONFIG_SCL_GPIO, -1);
+    ssd1306_init(&dev, 128, 64);
+    ssd1306_clear_screen(&dev, false);
+}
+
+void display(){
+	ssd1306_contrast(&dev, 0xff);
+    ssd1306_display_text(&dev, 0, "Teste", 5, false);
+	ssd1306_display_text(&dev, 1, "test2", 5, false);
+}
+
 void logDht11Values(struct dht11_reading readings){
     if(readings.status == DHT11_OK){
         ESP_LOGI(TAG_SENSOR, "Sensor readings temperature: %d, humidity: %d", readings.temperature, readings.humidity);
@@ -258,8 +281,6 @@ void vTaskDht11(void * pvParameters){
     }
 }
 
-TaskHandle_t xHandle = NULL;
-
 void app_main(void)
 {
     xTaskCreate(vTaskDht11,
@@ -286,6 +307,6 @@ void app_main(void)
     initWifi();
     initLed();
     initMqtt();
-
-
+    initDisplay();
+    display();
 }
